@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Malaria Cell Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:           #f5f2eb;
+    --surface:      #ffffff;
+    --ink:          #1a1a18;
+    --muted:        #8a8778;
+    --border:       #ddd9ce;
+    --red:          #c0392b;
+    --red-light:    #fdf0ee;
+    --red-mid:      #e8c4bf;
+    --green:        #1a7a4a;
+    --green-light:  #eef7f2;
+    --green-mid:    #b8dfc9;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 52px 16px 80px;
+  }
+
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: radial-gradient(circle, #c8c3b5 1px, transparent 1px);
+    background-size: 28px 28px; opacity: 0.4;
+    pointer-events: none; z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; width: 100%; max-width: 700px; }
+
+  /* ── Header ── */
+  header { text-align: center; margin-bottom: 44px; animation: rise 0.6s ease both; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase;
+    color: var(--red); border: 1px solid var(--red-mid);
+    background: var(--red-light); padding: 5px 14px;
+    border-radius: 2px; margin-bottom: 20px;
+  }
+
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: blink 2s infinite; }
+
+  h1 { font-family: 'DM Serif Display', serif; font-size: clamp(34px, 6vw, 58px); line-height: 1.05; letter-spacing: -1px; }
+  h1 em { font-style: italic; color: var(--red); }
+  .subtitle { margin-top: 12px; font-size: 11.5px; color: var(--muted); line-height: 1.85; }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; padding: 36px;
+    box-shadow: 0 2px 40px rgba(0,0,0,0.06);
+    animation: rise 0.6s 0.1s ease both;
+  }
+
+  /* ── Drop zone ── */
+  .drop-zone {
+    border: 1.5px dashed var(--border); border-radius: 12px;
+    padding: 56px 24px; text-align: center; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative; background: var(--bg);
+  }
+
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--red); background: var(--red-light); }
+
+  .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+  .upload-icon {
+    width: 56px; height: 56px; margin: 0 auto 18px;
+    background: var(--red-light); border: 1px solid var(--red-mid);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+
+  .upload-icon svg { width: 24px; height: 24px; color: var(--red); }
+  .drop-label { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  .drop-sub   { font-size: 11px; color: var(--muted); }
+
+  /* ── Preview ── */
+  #preview-wrap {
+    display: none; margin-top: 22px;
+    border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; position: relative;
+  }
+
+  #preview-img { width: 100%; max-height: 320px; object-fit: contain; display: block; background: #f0ede5; }
+
+  .preview-clear {
+    position: absolute; top: 10px; right: 10px;
+    width: 30px; height: 30px; background: rgba(26,26,24,0.72);
+    border: none; border-radius: 50%; color: #fff; cursor: pointer;
+    font-size: 14px; display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .preview-clear:hover { background: var(--red); }
+
+  /* ── Button ── */
+  #analyse-btn {
+    display: none; width: 100%; margin-top: 18px; padding: 16px;
+    background: var(--ink); color: #fff; border: none; border-radius: 10px;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    letter-spacing: 2px; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s, transform 0.15s;
+  }
+
+  #analyse-btn:hover:not(:disabled) { background: #2e2e2c; transform: translateY(-1px); }
+  #analyse-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+  .btn-spinner {
+    display: none; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto;
+  }
+
+  #analyse-btn.loading .btn-text   { display: none; }
+  #analyse-btn.loading .btn-spinner { display: block; }
+
+  /* ── Error ── */
+  .error-box {
+    display: none; margin-top: 16px; padding: 13px 17px;
+    background: #fff3f2; border: 1px solid var(--red-mid);
+    border-radius: 8px; font-size: 12px; color: var(--red);
+  }
+
+  /* ── Result ── */
+  #result { display: none; margin-top: 22px; border-radius: 14px; overflow: hidden; animation: rise 0.4s ease both; }
+
+  .result-header { padding: 24px 28px 16px; display: flex; align-items: center; gap: 18px; }
+
+  .result-icon { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .result-icon svg { width: 24px; height: 24px; }
+
+  .result-label-text { font-family: 'DM Serif Display', serif; font-size: 28px; line-height: 1.1; }
+  .result-conf       { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .result-note       { font-size: 11px; margin-top: 3px; font-style: italic; opacity: 0.85; }
+
+  .result.parasitized { background: var(--red-light);   border: 1px solid var(--red-mid); }
+  .result.parasitized .result-icon        { background: var(--red); }
+  .result.parasitized .result-label-text  { color: var(--red); }
+  .result.parasitized .result-note        { color: var(--red); }
+
+  .result.uninfected { background: var(--green-light); border: 1px solid var(--green-mid); }
+  .result.uninfected .result-icon        { background: var(--green); }
+  .result.uninfected .result-label-text  { color: var(--green); }
+  .result.uninfected .result-note        { color: var(--green); }
+
+  /* Bars */
+  .result-bars { padding: 4px 28px 24px; }
+  .bar-row { margin-bottom: 14px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; color: var(--ink); }
+  .bar-track { height: 8px; background: rgba(0,0,0,0.07); border-radius: 99px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 99px; width: 0; transition: width 0.85s cubic-bezier(0.25, 1, 0.5, 1); }
+  .bar-fill.red   { background: var(--red); }
+  .bar-fill.green { background: var(--green); }
+
+  /* ── Info strip ── */
+  .info-strip {
+    margin-top: 16px; display: grid;
+    grid-template-columns: repeat(4, 1fr); gap: 10px;
+    animation: rise 0.6s 0.2s ease both;
+  }
+
+  .info-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 10px; text-align: center; }
+  .info-val  { font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--ink); margin-bottom: 4px; }
+  .info-lbl  { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+
+  /* ── Footer ── */
+  footer { margin-top: 36px; text-align: center; font-size: 11px; color: var(--muted); animation: rise 0.6s 0.3s ease both; }
+
+  @keyframes rise  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes spin  { to { transform: rotate(360deg); } }
+
+  @media (max-width: 520px) {
+    .info-strip { grid-template-columns: 1fr 1fr; }
+    .card { padding: 22px; }
+    .result-header { padding: 18px 18px 12px; }
+    .result-bars { padding: 4px 18px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="badge"><div class="badge-dot"></div> MLR_DTC · Custom CNN · PyTorch</div>
+    <h1>Malaria Cell<br><em>Detector</em></h1>
+    <p class="subtitle">
+      Upload a blood smear microscopy image to detect<br>
+      Plasmodium parasite presence using deep learning.
+    </p>
+  </header>
+
+  <div class="card">
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/bmp,image/tiff"/>
+      <div class="upload-icon">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+      </div>
+      <div class="drop-label">Drop a cell image here or click to browse</div>
+      <div class="drop-sub">PNG · JPG · BMP · TIFF</div>
+    </div>
+
+    <div id="preview-wrap">
+      <img id="preview-img" src="" alt="Cell image preview"/>
+      <button class="preview-clear" id="clear-btn" title="Remove">✕</button>
+    </div>
+
+    <button id="analyse-btn">
+      <span class="btn-text">Analyse Image</span>
+      <span class="btn-spinner"></span>
+    </button>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div id="result">
+      <div class="result-header">
+        <div class="result-icon" id="result-icon"></div>
+        <div>
+          <div class="result-label-text" id="result-label"></div>
+          <div class="result-conf"       id="result-conf"></div>
+          <div class="result-note"       id="result-note"></div>
+        </div>
+      </div>
+      <div class="result-bars" id="result-bars"></div>
+    </div>
+  </div>
+
+  <div class="info-strip">
+    <div class="info-tile"><div class="info-val">MLR_DTC</div><div class="info-lbl">Model</div></div>
+    <div class="info-tile"><div class="info-val">128²</div><div class="info-lbl">Input Size</div></div>
+    <div class="info-tile"><div class="info-val">Binary</div><div class="info-lbl">Task</div></div>
+    <div class="info-tile"><div class="info-val">2 Classes</div><div class="info-lbl">Output</div></div>
+  </div>
+
+  <footer>For research &amp; educational use only · Not a clinical diagnostic tool</footer>
+</div>
+
+<script>
+const dropZone    = document.getElementById('drop-zone');
+const fileInput   = document.getElementById('file-input');
+const previewWrap = document.getElementById('preview-wrap');
+const previewImg  = document.getElementById('preview-img');
+const clearBtn    = document.getElementById('clear-btn');
+const analyseBtn  = document.getElementById('analyse-btn');
+const errorBox    = document.getElementById('error-box');
+const resultEl    = document.getElementById('result');
+const resultIcon  = document.getElementById('result-icon');
+const resultLabel = document.getElementById('result-label');
+const resultConf  = document.getElementById('result-conf');
+const resultNote  = document.getElementById('result-note');
+const resultBars  = document.getElementById('result-bars');
+
+let selectedFile = null;
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+clearBtn.addEventListener('click', reset);
+
+function handleFile(f) {
+  selectedFile = f;
+  const reader = new FileReader();
+  reader.onload = e => {
+    previewImg.src            = e.target.result;
+    previewWrap.style.display = 'block';
+    analyseBtn.style.display  = 'block';
+    resultEl.style.display    = 'none';
+    errorBox.style.display    = 'none';
+  };
+  reader.readAsDataURL(f);
+}
+
+function reset() {
+  selectedFile = null; fileInput.value = ''; previewImg.src = '';
+  previewWrap.style.display = 'none';
+  analyseBtn.style.display  = 'none';
+  resultEl.style.display    = 'none';
+  errorBox.style.display    = 'none';
+}
+
+analyseBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  analyseBtn.classList.add('loading');
+  analyseBtn.disabled = true;
+  errorBox.style.display = 'none';
+  resultEl.style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('image', selectedFile);
+
+  try {
+    const res  = await fetch('/predict', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showResult(data);
+  } catch (err) {
+    errorBox.textContent   = '⚠ ' + err.message;
+    errorBox.style.display = 'block';
+  } finally {
+    analyseBtn.classList.remove('loading');
+    analyseBtn.disabled = false;
+  }
+});
+
+function showResult(data) {
+  const isP = data.label === 'Parasitized';
+  resultEl.className     = 'result ' + (isP ? 'parasitized' : 'uninfected');
+  resultEl.style.display = 'block';
+
+  resultIcon.innerHTML = isP
+    ? `<svg fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`
+    : `<svg fill="none" stroke="#fff" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+
+  resultLabel.textContent = data.label;
+  resultConf.textContent  = `Confidence: ${data.confidence}%`;
+  resultNote.textContent  = isP
+    ? 'Malaria parasite detected in cell.'
+    : 'No parasite detected. Cell appears healthy.';
+
+  resultBars.innerHTML = '';
+  [['Parasitized', data.probs['Parasitized'], 'red'],
+   ['Uninfected',  data.probs['Uninfected'],  'green']].forEach(([name, prob, color]) => {
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `
+      <div class="bar-label"><span>${name}</span><span>${prob}%</span></div>
+      <div class="bar-track"><div class="bar-fill ${color}" data-w="${prob}"></div></div>`;
+    resultBars.appendChild(row);
+  });
+
+  requestAnimationFrame(() =>
+    document.querySelectorAll('.bar-fill').forEach(b => b.style.width = b.dataset.w + '%')
+  );
+}
+</script>
+</body>
+</html>
