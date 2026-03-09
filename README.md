@@ -25,7 +25,10 @@ malaria-detector/
 ### 1. Install dependencies
 ```bash
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+#Mac:
+ source venv/bin/activate
+# Windows:
+ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -46,15 +49,6 @@ python train.py
 ```
 Saves `model/malaria_model.pt` automatically.
 
-**Already have your trained model from Colab?**
-Just export it and drop it in:
-```python
-# In Colab:
-torch.save(m0.state_dict(), 'malaria_model.pt')
-from google.colab import files
-files.download('malaria_model.pt')
-```
-Then place `malaria_model.pt` inside the `model/` folder — skip `train.py` entirely.
 
 ### 4. Run the app
 ```bash
