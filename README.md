@@ -71,5 +71,12 @@ Open → **http://localhost:5000**
 | Preprocessing | Resize(128,128) + ToTensor()       |
 
 
+## Results
+| Metric | Score |
+|--------|-------|
+| Train Accuracy | 92.8% |
+| Validation Accuracy | 94.2% |
+
+
 ## Live Demo
 Try it here: [Hugging Face Space](https://huggingface.co/spaces/annir241/Malaria-Detection-Model)
