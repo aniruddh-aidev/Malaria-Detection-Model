@@ -69,3 +69,7 @@ Open → **http://localhost:5000**
 | Optimizer     | Adam (lr=0.01)                     |
 | Classes       | Parasitized (0) · Uninfected (1)  |
 | Preprocessing | Resize(128,128) + ToTensor()       |
+
+
+## Live Demo
+Try it here: [Hugging Face Space](https://huggingface.co/spaces/annir241/Malaria-Detection-Model)
